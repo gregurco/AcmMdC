@@ -1,0 +1,6 @@
+*.[oa]
+*.log
+*~
+protected/runtime/*
+assets/*
+files/testing/*
