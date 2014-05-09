@@ -27,6 +27,8 @@ class CronCommand extends CConsoleCommand
                 $compile_result = $this->console->exec('cd '.$dir.'; fpc '.$dir.'/1 2> log.txt');
             }elseif($processing->compiler == 'GCC'){
                 $this->console->exec('cd '.$dir.'; gcc '.$dir.'/1'.$this->fileExtension($processing->compiler).' -o '.$dir.'/1 2> '.$dir.'/log.txt');
+            }elseif($processing->compiler == 'Prolog'){
+                $this->console->exec('cd '.$dir.'; swipl --goal=goal --stand_alone=true -o 1 -c 1.pl 2> '.$dir.'/log.txt');
             }
 			
 			$compile_result = file_get_contents($dir.'/log.txt');
@@ -138,6 +140,9 @@ class CronCommand extends CConsoleCommand
 			case "GCC":
 				return ".c";
 				break;
+			case "Prolog":
+				return ".pl";
+				break;				
 		}
 	}
 	
