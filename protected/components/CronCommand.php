@@ -21,20 +21,24 @@ class CronCommand extends CConsoleCommand
             Processing::model()->updateByPk($processing->id, array('status' => 2));
 			
             $dir = '/var/www/AcmMdC/files/testing';
-			file_put_contents($dir.'/1'.$this->fileExtension($processing->compiler), $processing->file_text);
+			file_put_contents($dir.'/'.$this->fileName($processing->compiler), $processing->file_text);
 
             if ($processing->compiler == 'FPC'){
                 $compile_result = $this->console->exec('cd '.$dir.'; fpc '.$dir.'/1 2> log.txt');
             }elseif($processing->compiler == 'GCC'){
-                $this->console->exec('cd '.$dir.'; gcc '.$dir.'/1'.$this->fileExtension($processing->compiler).' -o '.$dir.'/1 2> '.$dir.'/log.txt');
+                $this->console->exec('cd '.$dir.'; gcc '.$dir.'/'.$this->fileName($processing->compiler).' -o '.$dir.'/1 2> '.$dir.'/log.txt');
+            }elseif($processing->compiler == 'G++'){
+                $this->console->exec('cd '.$dir.'; g++ '.$dir.'/'.$this->fileName($processing->compiler).' -o '.$dir.'/1 2> '.$dir.'/log.txt');
             }elseif($processing->compiler == 'Prolog'){
                 $this->console->exec('cd '.$dir.'; swipl --goal=goal --stand_alone=true -o 1 -c 1.pl 2> '.$dir.'/log.txt');
+            }elseif($processing->compiler == 'Java'){
+                $this->console->exec('cd '.$dir.'; javac '.$dir.'/'.$this->fileName($processing->compiler).' 2> '.$dir.'/log.txt');
             }
 			
 			$compile_result = file_get_contents($dir.'/log.txt');
             $compile_result = nl2br($compile_result);
 
-            if (file_exists($dir.'/1')){
+            if (($processing->compiler == 'Java' && file_exists($dir.'/Main.class')) || ($processing->compiler != 'Java' && file_exists($dir.'/1'))){
                 /* Успешная компиляция */
                 Processing::model()->updateByPk($processing->id, array('status' => 3,  'log_compile' => $compile_result));
 				$this->test($processing);
@@ -62,11 +66,18 @@ class CronCommand extends CConsoleCommand
             $tests[$i] = false;
 
             copy($dir_input."/".$i.'.txt', $dir_to."/input.txt");
-
-            $execite_result = $this->execute_shell(
-                "cd ".$dir_to."; ulimit -v ".(1024*$processing->limit_memory)."; time sudo time -v -o './log_time.txt' timeout ".$processing->limit_time." ./1;",
-                $dir_to
-            );
+			
+			if ($processing->compiler == 'Java'){
+				$execite_result = $this->execute_shell(
+					"cd ".$dir_to."; ulimit -v ".(1024*$processing->limit_memory*100)."; time sudo time -v -o './log_time.txt' timeout ".($processing->limit_time*10)." java Main;",
+					$dir_to
+				);
+			}else{
+				$execite_result = $this->execute_shell(
+					"cd ".$dir_to."; ulimit -v ".(1024*$processing->limit_memory)."; time sudo time -v -o './log_time.txt' timeout ".$processing->limit_time." ./1;",
+					$dir_to
+				);
+			}
 
             if ($execite_result[0] == 'time'){
                 $tests_text[$i] = array('time', $execite_result[1]);
@@ -94,9 +105,9 @@ class CronCommand extends CConsoleCommand
                 }
             }
 
-            unlink($dir_to."/input.txt");
-            unlink($dir_to."/output.txt");
-            unlink($dir_to."/log_time.txt");
+            @unlink($dir_to."/input.txt");
+            @unlink($dir_to."/output.txt");
+            @unlink($dir_to."/log_time.txt");
         }
         Processing::model()->updateByPk($processing->id, array('status' => 5, 'tests' => json_encode($tests_text), 'result' => $result));
 		$this->clearDir();
@@ -132,17 +143,23 @@ class CronCommand extends CConsoleCommand
         }
     }
 	
-	private function fileExtension($compiler){
+	private function fileName($compiler){
 		switch($compiler){
 			case "FPC":
-				return ".pas";
+				return "1.pas";
 				break;
 			case "GCC":
-				return ".c";
+				return "1.c";
 				break;
-			case "Prolog":
-				return ".pl";
+			case "G++":
+				return "1.cpp";
 				break;				
+			case "Prolog":
+				return "1.pl";
+				break;	
+			case "Java":
+				return "Main.java";
+				break;		
 		}
 	}
 	
